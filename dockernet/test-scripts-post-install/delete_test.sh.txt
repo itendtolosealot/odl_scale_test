@@ -1,0 +1,4 @@
+openstack port delete port1
+openstack port delete port2
+openstack subnet delete subnet1
+openstack network delete net1

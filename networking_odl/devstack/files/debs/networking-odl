@@ -1,0 +1,3 @@
+libxml-xpath-perl # for xpath command
+patch # for patch command
+syslinux-utils

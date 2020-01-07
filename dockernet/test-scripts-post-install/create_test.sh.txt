@@ -1,0 +1,5 @@
+openstack network create --provider-network-type vxlan net1
+openstack subnet create --subnet-range 192.168.11.0/24 --prefix-length 24 --dhcp --ip-version 4 --network net1 --gateway 192.168.11.1 --host-route destination=10.128.128.103/32,gateway=10.128.128.101 --host-route destination=11.129.129.104/32,gateway=192.168.11.240 subnet1
+openstack port create --network net1 --fixed-ip subnet=subnet1 --disable-port-security --device-owner compute:nova port1
+openstack port create --network net1 --fixed-ip subnet=subnet1 --disable-port-security --device-owner compute:nova port2
+

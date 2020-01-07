@@ -1,0 +1,9 @@
+FROM ubuntu:18.04
+MAINTAINER ashvin213@gmail.com 
+RUN apt-get update 
+RUN apt-get install -y net-tools iputils-ping iproute2
+ADD inside_script.sh /
+RUN chmod a+x /inside_script.sh
+ENV PATH="/:${PATH}"
+CMD ["sh", "-c", "/inside_script.sh"] 
+#CMD ["bash"] 

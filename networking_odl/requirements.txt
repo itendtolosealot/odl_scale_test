@@ -1,0 +1,19 @@
+# The order of packages is significant, because pip processes them in the order
+# of appearance. Changing the order has an impact on the overall integration
+# process, which may cause wedges in the gate later.
+
+pbr>=3.1.1 # Apache-2.0
+Babel>=2.5.3 # BSD
+stevedore>=1.28.0 # Apache-2.0
+debtcollector>=1.19.0 # Apache-2.0
+neutron-lib>=1.18.0 # Apache-2.0
+websocket-client>=0.47.0 # LGPLv2+
+
+# OpenStack CI will install the following projects from git
+# if they are in the required-projects list for a job:
+neutron>=13.0.0.0b1 # Apache-2.0
+neutron-lbaas>=13.0.0.0b1 # Apache-2.0
+networking-l2gw>=12.0.0  # Apache-2.0
+networking-sfc>=6.0.0  # Apache-2.0
+networking-bgpvpn>=8.0.0  # Apache-2.0
+ceilometer>=11.0.0

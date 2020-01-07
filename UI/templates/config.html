@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="jumbo">
+    <table style="width:50%, height:60px%, text-align:center,valign:middle">
+        <thead valign="middle">
+            <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        {% for key,value in config.items() %}
+        <tr>
+            <th> {{ key }} </th>
+            <td> {{ value }} </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
+
+

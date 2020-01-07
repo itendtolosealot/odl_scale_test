@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+{% block content %}
+<body>
+<head>Configuration Data</head>
+<table border = 1>
+    {% for key, value in result.items() %}
+    <tr>
+        <th> {{ key }} </th>
+        <td> {{ value }} </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<head>Simulator Response</head>
+    <table border=1>
+        <thead>
+        <tr>
+            <th><center>{{title}}</center></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in response %}
+        <tr class="row100 body">
+            <td class="cell100 column1"><center><xmp>{{row}}</xmp></center></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+{% endblock %}

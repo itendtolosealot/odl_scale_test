@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Table V05</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--===============================================================================================-->
+    <link rel="icon" type="image/png" href="images/icons/favicon.ico"/>
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="vendor/bootstrap/css/bootstrap.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="fonts/font-awesome-4.7.0/css/font-awesome.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="vendor/animate/animate.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="vendor/select2/select2.min.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="vendor/perfect-scrollbar/perfect-scrollbar.css">
+    <!--===============================================================================================-->
+    <link rel="stylesheet" type="text/css" href="css/util.css">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <!--===============================================================================================-->
+</head>
+<header>
+    <div id=class="container">
+        <h1 class="jumbo">Netscale Simulator</h1>
+    </div>
+</header>
+<body>
+<table>
+    <tr>
+        <th><a href="{{ url_for('test')}}">Test Management</a></th>
+        <th><a href="{{ url_for('deploy')}}">Manage Virtual Computes</a></th>
+        <th><a href="{{ url_for('config')}}">Current Configuration</a></th>
+        <th><a href="{{ url_for('mip')}}">MIP Management</a></th>
+    </tr>
+</table>
+{% block content %}
+{% endblock %}
+</body>
+</html>

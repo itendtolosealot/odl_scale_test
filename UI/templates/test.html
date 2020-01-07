@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<body>
+<form action = "http://127.0.0.1:5000/result" method = "POST">
+    <input type="checkbox" name="subnet"> Enable ELAN test<br>
+    <input type="checkbox" name="router"> Enable Routing test<br>
+    <input type="checkbox" name="mip_test"> Enable MIP test<br>
+    <input type="checkbox" name="ecmp_test"> Enable ECMP test<br>
+    <tr>
+        <p>
+        <td> <input type = "submit" value = "Enable Test" name="Activate"/></td>
+        <td> <input type = "submit" value = "Disable Test" name="Deactivate"/></td>
+        </p>
+    </tr>
+</form>
+</body>
+{% endblock %}
