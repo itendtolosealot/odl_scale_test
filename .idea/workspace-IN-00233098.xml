@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="a9f70d35-8f9c-4ef7-8ec9-1699280f8e97" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/UI/static/css/form.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/static/css/main.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/static/js/form.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/static/js/openLink.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/config.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/deploy.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/layout.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/mip.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/result.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/templates/test.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/UI/webui.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dockernet/Virtual Compute container/configure_mips.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/Kafka_Consumer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/Kafka_Producer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/clish.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/simulator_commands.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/stateless_testbed.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/test_lpm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/networking_odl/networking_odl/ml2/test_mip.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test_pointers.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../netconf_vrouter/netconf_config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../netconf_vrouter/ssh_configuration.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/examples/simplePing.py" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/examples/simplePing.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Frontend/maxinet.py" beforeDir="false" afterPath="$PROJECT_DIR$/Frontend/maxinet.py" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CodeStyleSettingsInfer">
+    <option name="done" value="true" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="HTML File" />
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
+  </component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="1" />
+  </component>
+  <component name="ProjectId" id="1S02loK1NnG9OY27oVEsMGqpSii" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="DefaultHtmlFileTemplate" value="HTML File" />
+    <property name="last_opened_file_path" value="C:/Program Files/Git/bin/git.exe" />
+    <property name="project.structure.last.edited" value="SDKs" />
+    <property name="project.structure.proportion" value="0.0" />
+    <property name="project.structure.side.proportion" value="0.2" />
+    <property name="settings.editor.selected.configurable" value="vcs.Git" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Python.flask_test">
+    <configuration name="flask_test" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="MaxiNet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/UI" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="C:\Users\eashvla\OneDrive - Ericsson AB\Coding\MaxiNet\UI\webui.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="test_pointers" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="MaxiNet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test_pointers.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.flask_test" />
+        <item itemvalue="Python.test_pointers" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="a9f70d35-8f9c-4ef7-8ec9-1699280f8e97" name="Default Changelist" comment="" />
+      <created>1570686345392</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1570686345392</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.css" />
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.js" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="COLUMN_ORDER" />
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

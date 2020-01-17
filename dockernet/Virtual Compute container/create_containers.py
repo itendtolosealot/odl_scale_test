@@ -150,7 +150,7 @@ def attach_veth_to_container(client, cont_name, vm_port_name, gateway_cidr_tuple
 
 def parse_arguments():
 	parser = argparse.ArgumentParser(description="Create a container & attach it to the ovs switch")
-	parser.add_argument("-op", "--operation", action='store', dest="operation",help="Action add or del a container " )
+	parser.add_argument("-op", "--operation", action='store', dest="operation",help="Action add or del a container ")
 	parser.add_argument("-c", "--container-name", action='store', dest="cont_name", help="Name of the container")
 	parser.add_argument("-i", "--image-name", action="store",dest="image_name", help="Name of the docker Image")
 	parser.add_argument("-o", "--ovs-port-name", action="store", dest="ovs_port_name", help="Name of the ovs port")

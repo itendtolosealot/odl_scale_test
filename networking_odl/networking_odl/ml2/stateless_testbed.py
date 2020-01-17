@@ -18,7 +18,7 @@ import uuid
 import dockernet
 import socket
 import random
-import queue
+from multiprocessing import Queue
 import plyvel
 import ipaddress
 import sys
@@ -27,6 +27,7 @@ from prettytable import PrettyTable
 from kafka import KafkaConsumer
 from UI.webui import WebUIForSimulator
 import argparse
+from oslo_config import cfg
 
 NEUTRONHANDLERPOINTER = None
 DEFAULT_MTU = 1450
@@ -34,8 +35,8 @@ MAX_VIRTUAL_COMPUTES=150
 MAX_MIPS_PER_SUBNET=10
 
 class Console(TelnetHandler):
-    WELCOME = "Welcome to maxinet CLI. This software belongs to ERICSSON. If you have accidentally accessed this portal, exit immediately"
-    PROMPT = "maxinet> "
+    WELCOME = "Welcome to Maxinet CLI. This software belongs to ERICSSON. If you have accidentally accessed this portal, exit immediately"
+    PROMPT = "Maxinet> "
     authNeedUser=False
     authNeedPassword=False
 
@@ -93,6 +94,8 @@ class Console(TelnetHandler):
         '''
         self._callback_handler = NEUTRONHANDLERPOINTER
         self.__process_telnet_command("router",params)
+
+
 
     @command('start_computes')
     def command_start_computes(self,params):
@@ -186,6 +189,17 @@ class Console(TelnetHandler):
         if(message != None):
             self.writeresponse(message)
 
+    @command('reset_computes')
+    def command_reset_computes(self,params):
+        '''
+	   The command will reset the simulator and all the DBs. It will destroy all VMs
+	   '''
+        self._callback_handler=NEUTRONHANDLERPOINTER
+        message = self._callback_handler.reset_simulation()
+        if(message!= None):
+            self.writeresponse(message)
+
+
     @command('get_compute_status')
     def command_get_compute_status(self, params):
         '''
@@ -201,6 +215,15 @@ class Console(TelnetHandler):
             self.writeresponse(str(table))
         except Exception as ex:
             self.writeresponse("Encountered Error during processing. See logs for details " + str(ex.message) + "\n Data: " + str(row))
+
+    @command('get_port_status')
+    def command_get_port_status(self, params):
+        '''
+        Provide Location/IP info for all ports
+        '''
+        self._callback_handler=NEUTRONHANDLERPOINTER
+        message = self._callback_handler.get_neutronport_status()
+        self.writeresponse(message)
 
     @command('create_mips')
     def command_create_mip(self, params):
@@ -302,32 +325,65 @@ class Console(TelnetHandler):
         else:
             self.writeresponse(message)
 
-class NeutronEventHandler():
-    def __init__(self):
+
+class NeutronEventHandler(dockernet.DataBaseRestore):
+    def __init__(self, file_location="/home/stack/mininet_handler/config.ini"):
+        self._file_location=file_location
+        self.read_config(file_location)
+        self._initialize(file_location)
+
+    def read_config(self, file_location):
+        try:
+            grp = cfg.OptGroup('testbed_properties')
+            opts = [cfg.StrOpt("log_file", default="/home/stack/mininet_handler/mininet_handler.log"),
+                    cfg.StrOpt("db_loc", default=" '/home/stack/mininet_handler/db/"),
+                    cfg.IntOpt("queue_timeout", default=4),
+                    cfg.IntOpt("elan_timer_interval", default=20),
+                    cfg.IntOpt("router_timer_interval", default=20),
+                    cfg.IntOpt("mip_timer_interval", default=20),
+                    cfg.StrOpt("kafka_brokers", default="localhost:9092"),
+                    cfg.IntOpt("telnet_port", default=55555),
+                    cfg.IntOpt("num_computes", default=10 ),
+                    cfg.StrOpt("controller_ip", default="localhost"),
+                    cfg.BoolOpt("use_partitions", default=False)]
+            cfg.CONF.register_group(grp)
+            cfg.CONF.register_opts(opts, group=grp)
+            file_location= ['--config-file', str(file_location)]
+            print("Config file: " + str(file_location))
+            cfg.CONF(file_location)
+        except Exception as ex:
+            print("Error in processing configuration file. Exitting the program")
+            print("Exception:" + str(ex.message))
+            sys.exit(1)
+        self._log_file = cfg.CONF.testbed_properties.log_file
+        self._db_loc = cfg.CONF.testbed_properties.db_loc
+        self._queue_timeout = cfg.CONF.testbed_properties.queue_timeout
+        self._elan_timer_interval = cfg.CONF.testbed_properties.elan_timer_interval
+        self._router_timer_interval=cfg.CONF.testbed_properties.router_timer_interval
+        self._mip_timer_interval=cfg.CONF.testbed_properties.mip_timer_interval
+        self.kafka_brokers = cfg.CONF.testbed_properties.kafka_brokers
+        self._telnet_port = cfg.CONF.testbed_properties.telnet_port
+        self._controller_ip = cfg.CONF.testbed_properties.controller_ip
+        self._num_virtual_computes = cfg.CONF.testbed_properties.num_computes
+        self._use_partitions = cfg.CONF.testbed_properties.use_partitions
+        #self._log_handler.info("Controller IP: " + str(self._controller_ip) + " Number of Computes: " + str(self._num_virtual_computes))
+
+    def _initialize(self, file_location):
         self._mininet_data = dict()
         self._locks = dict()
         #self.webui = WebUIForSimulator(self)
-        self._databases = list(['network', 'subnet', 'port', 'router', 'subnet_port_map', 'dhcp_server', 'port_to_ip_mapping', 'gateway_ip', 'subnet_mips', 'ip_to_port_mapping', 'subnet_to_router_map'])
+        self._databases = list(['network', 'subnet', 'port', 'router', 'subnet_port_map', 'dhcp_server', 'port_to_ip_mapping', 'gateway_ip', 'subnet_mips', 'ip_to_port_mapping', 'subnet_to_router_map', 'elan_test_data', 'router_test_data'])
         for key in self._databases:
             self._mininet_data[key] = dict()
             self._locks[key] = threading.Lock()
         self._SIMULATION_STARTED=False
-        self._queue = queue.Queue()
-        self._queue_timeout=4
-        self._initialize()
-
-    def _initialize(self):
-        self._setup_logger("Simulator", "/home/stack/mininet_handler/mininet_handler.log", level=logging.DEBUG)
-        self._db_loc = '/home/stack/mininet_handler/db/'
+        self._setup_logger("Simulator", self._log_file, level=logging.DEBUG)
         self._log_handler = logging.getLogger("Simulator")
         self._tests_enabled = dict()
         global NEUTRONHANDLERPOINTER
         NEUTRONHANDLERPOINTER= self
-        self._dockernet= dockernet.DockerHandler()
+        self._dockernet= dockernet.DockerHandler(file_location)
         self.restore_from_db()
-        self._elan_timer_interval = 20
-        self._router_timer_interval=20
-        self._mip_timer_interval=20
         self._console = Console
         self._telnet_handler= threading.Thread(target=self._create_telnet_channel, args=(3,))
         #self._webui_handler = threading.Thread(target=self.start_web_ui, args=("192.168.56.101", 8000))
@@ -337,13 +393,14 @@ class NeutronEventHandler():
         self._tests_enabled["router"] = False
         self._mip_enabled = False
         self._num_of_mips = 0
-        self._num_virtual_computes = 0
         self._elan_test_timers = dict()
         self._router_test_timers=dict()
         self._mip_test_timers = dict()
         self._telnet_handler.start()
         #self._webui_handler.start()
         self._topic = "neutron_events_for_simulation"
+        self.handle_switch_creation("start", controller_ip=self._controller_ip, num_switches=self._num_virtual_computes)
+        self._partition_id = self._dockernet.get_partition_id()
 
     def list_of_ovs(self):
         return (self._dockernet.get_list_of_computes())
@@ -356,6 +413,42 @@ class NeutronEventHandler():
             self._log_handler.warning("Encountered Keyboard Interrupt. Terminating the WebUI")
         except Exception as ex:
             self._log_handler.error("Encountered exception: " + str(ex.message))'''
+
+    def does_port_belong_to_my_partition(self, port):
+        if(self._use_partitions==False):
+            return True
+        elif(self._partition_id == port['name'][0:10]):
+            return True
+        else:
+            return False
+
+    def get_neutronport_status(self):
+        def get_data_in_list_form(headers, data):
+            result=list()
+            self._log_handler.debug("Received data: " + str(data) + "Type: " + str(type(data)))
+            index = 0
+            for key in headers:
+                if(key in data):
+                    self._log_handler.debug("Key: " + str(key) + "Value: " + str(data[key]))
+                    result.append(str(data[key]))
+                else:
+                    result.append(" ")
+                index=index+1
+            return result
+
+        port_status  = self._dockernet.get_port_info()
+        self._log_handler.debug("Obtained port stats: " + str(port_status))
+        if (len(port_status.keys())==0):
+            return "No ports are configured. "
+        else:
+            Headers = ["Port UUID", "location", "ip_v4", "subnet_v4", "ip_v6", "subnet_v6"]
+            message = PrettyTable(Headers)
+            for uuid in port_status.keys():
+                data = ast.literal_eval(str(port_status[uuid]))
+                data['Port UUID']= uuid
+                row = get_data_in_list_form(Headers, data)
+                message.add_row(row)
+        return str(message)
 
     def configure_resource(self,res):
         _HANDLERS = {
@@ -390,7 +483,7 @@ class NeutronEventHandler():
 
     def _create_telnet_channel(self, val):
         self._log_handler.info("Telnet server started")
-        self._telnet_server =gevent.server.StreamServer(('127.0.0.1', 55555), self._console.streamserver_handle)
+        self._telnet_server =gevent.server.StreamServer(('127.0.0.1', self._telnet_port), self._console.streamserver_handle)
         try:
             self._telnet_server.serve_forever()
         except KeyboardInterrupt:
@@ -422,6 +515,20 @@ class NeutronEventHandler():
             message = "Encountered error during process. See logs for details."
         self._log_handler.debug("Returning message: " + str(message))
         return message
+
+    def reset_simulation(self):
+        self._dockernet.reset()
+        for key in self._databases:
+            self._mininet_data[key] = dict()
+        self._tests_enabled["subnet"] = False
+        self._tests_enabled["router"] = False
+        self._mip_enabled = False
+        self._num_of_mips = 0
+        self._num_virtual_computes = 0
+        self._elan_test_timers = dict()
+        self._router_test_timers=dict()
+        self._mip_test_timers = dict()
+        self._SIMULATION_STARTED=False
 
     def _get_total_ips_available(self, sub_info, cidr):
         _version_dict = {
@@ -803,7 +910,6 @@ class NeutronEventHandler():
 
         return message
 
-
     def _handle_cleanup(self,params):
         message = ""
         param_dict = {
@@ -854,7 +960,7 @@ class NeutronEventHandler():
                 message = "Virtual computes could not be started. See log for additional details"
             else:
                 self._SIMULATION_STARTED=True
-                message = str(num_switches) + " computes were started successfully. The containers are numbered ovs0...ovs" + str(num_switches-1)
+                message = str(num_switches) + " computes were started successfully. Use ovs_list command to get their names"
         if cmd=='stop' and self._SIMULATION_STARTED:
             result = self._dockernet.docker_down()
             self._num_virtual_computes = 0
@@ -1180,6 +1286,9 @@ class NeutronEventHandler():
                     self._log_handler.warning("The port uuid: " + str(port_uuid) + " does not exist. Ignoring the event....")
                     return True
             elif event in ("after_create", "after_update"):
+                if(not self.does_port_belong_to_my_partition(kwargs)):
+                    self._log_handler.info("Received port with name: " + str(kwargs['name']) + ". My partition is: " + str(self._partition_id) + ". It doesn't match. Ignoring the event")
+                    return True
                 try:
                     port_uuid = kwargs['id']
                     self._log_handler.debug("Received port create/update event for port: " + str(port_uuid))
@@ -1380,20 +1489,6 @@ class NeutronEventHandler():
         elif (action == "del"):
             self._dockernet.unconfigure_extra_routes(router_uuid, extra_route_pair)
 
-    def resource_configured(self, res):
-        try:
-            self._queue.put(res)
-        except Exception as ex:
-            self._log_handler.error("Obtained exception when enqueuing data: " + str(ex.message))
-            return False
-        return True
-
-    def keepalive(self):
-        self._ka_count = self._ka_count+1
-        if (self._ka_count % self._ka_message_interval==0):
-            self._log_handler.debug("Received " + str(self._ka_count) + " keepalive messages")
-        return True
-
     def _setup_logger(self,name, log_file, level=logging.INFO):
         log_handler = logging.getLogger(name)
         self._filehandler=logging.FileHandler(log_file, mode='w')
@@ -1410,15 +1505,25 @@ class NeutronEventHandler():
                 file_loc = self._db_loc + str(key)
                 self._log_handler.debug("Attempting to locate DB files at " + str(file_loc))
                 if(destroy):
-                    plyvel.destroy_db(file_loc)
+                    try:
+                        plyvel.destroy_db(file_loc)
+                    except Exception as ex:
+                        self._log_handler.warning("Receiving and exception when deleting a DB: " + str(ex.message))
+                        pass
                 if (create_if_missing):
-                    db[key]= plyvel.DB(file_loc, create_if_missing=True)
+                    try:
+                        db[key]= plyvel.DB(file_loc, create_if_missing=True)
+                        res[key] = True
+                    except Exception as ex:
+                        self._log_handler.error("Received Exception when creating DB handler for : " + str(key) + " : " + str(ex.message))
+                        res[key]= False
                 else:
-                    db[key]=plyvel.DB(file_loc, create_if_missing=False)
-                res[key] = True
-            except IOError:
-                self._log_handler.info("DB not found. Will not restore data")
-                res[key] = False
+                    try:
+                        db[key]=plyvel.DB(file_loc, create_if_missing=False)
+                        res[key] = True
+                    except IOError:
+                        self._log_handler.info("DB not found. Cannot restore data")
+                        res[key] = False
             except Exception as ex:
                 self._log_handler.exception("Encountered Exception in creating DB handlers: ")
                 res[key] = False
@@ -1451,7 +1556,6 @@ class NeutronEventHandler():
                 self._log_handler.error("Could not restore all data. System state inconsistent. Terminating the program")
                 self._log_handler.error("Try deleting all the DBs by running rm -rf " + str(self._db_loc) + "* and restarting the program")
                 sys.exit(1)
-
         except Exception as ex:
             self._log_handler.error("Encountered exception during restoration: " + str(ex.message))
             sys.exit(1)
@@ -1489,15 +1593,19 @@ if __name__ == '__main__':
         else:
             print("Encountered error while storing data in DB")
 
-    parser = argparse.ArgumentParser(description="Kafka Information")
-    parser.add_argument("-i", "--ip-address", action="store",dest="kip_address", default="localhost", help="Kafka IP")
-    parser.add_argument("-p", "--port", action="store",dest="kport", help="Kafka Port", default=9092, type=int)
+    parser = argparse.ArgumentParser(description="Config File Location")
+    parser.add_argument("-f", "--file-loc", action="store", dest="file_location", default="/home/stack/mininet_handler/config.ini")
     args = parser.parse_args()
-    handler = NeutronEventHandler()
+    if args.file_location == None:
+        print("File location was not processed correctly!")
+        sys.exit(1)
+    else:
+        print("Looking for configurations in file: " + str(args.file_location))
+    handler = NeutronEventHandler(args.file_location)
     topic = "neutron_events_for_simulation"
-    consumer = KafkaConsumer(bootstrap_servers=str(args.kip_address) + str(args.kport), auto_offset_reset='earliest', value_deserializer=lambda m: json.loads(m.decode('utf-8')),group_id="simulator_consumer" )
+    consumer = KafkaConsumer(bootstrap_servers=handler.kafka_brokers, auto_offset_reset='earliest', value_deserializer=lambda m: json.loads(m.decode('utf-8')),group_id="simulator_consumer" )
     consumer.subscribe(topic)
-    handler._log_handler.info("Kafka consumer created for topic: " + str(topic))
+    handler._log_handler.info("Subscribed for topic: " + str(topic))
     try:
         for msg in consumer:
             assert isinstance(msg.value, dict)

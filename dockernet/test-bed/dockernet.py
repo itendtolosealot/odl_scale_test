@@ -2,12 +2,14 @@
 
 # PRE-REQUISITES
 1. docker platform must be installed.
-2. Python 2.7.x must be installed
+2. Python 3.5.x must be installed
 3. docker image must be present
 4. ODL and docker containers must be running under same subnet same IP range.
 
 """
-
+import os
+import uuid
+import sys
 import subprocess
 import re
 import hashlib
@@ -19,32 +21,184 @@ from prettytable import PrettyTable
 from functools import reduce
 import docker
 import requests
-
-
+from oslo_config import cfg
+from neutronclient.v2_0 import client
+from keystoneauth1 import identity
+from keystoneauth1 import session
 MAX_THREADS = 5
+
+'''class DataBaseRestore():
+	def __init__(self):
+		self._databases = list()
+		self._loghandler = ""
+		self._db_loc = "/home/stack"
+		self._locks = dict()
+
+	def store_in_db(self):
+		(res, _KEYS, db) = self._populate_db_handlers(destroy=True, create_if_missing=True)
+		for key in _KEYS:
+			if(res[key]):
+				self._locks[key].acquire()
+				wb = db[key].write_batch()
+				for item in self._mininet_data[key].keys():
+					try:
+						wb.put(item, str.encode(str(self._mininet_data[key][item]).encode("ascii")))
+						self._log_handler.debug("Wrote key: " + str(item) + " value: " + str(self._mininet_data[key][item]).encode("ascii") + " to " + str(key) +" DB" )
+					except TypeError:
+						self._log_handler.error("Obtained type error for DB: " + str(key) + " with key: " + str(item))
+						continue
+				wb.write()
+				self._locks[key].release()
+			else:
+				self._log_handler.debug("For DB: " + str(key) + " handlers could not be created. Data will not be stored")
+		self._dockernet.store_in_db()
+		return True
+
+	def _populate_db_handlers(self, destroy=False, create_if_missing=False):
+		_KEYS = self._databases
+		db = dict()
+		res = dict()
+		for key in _KEYS:
+			try:
+				file_loc = self._db_loc + str(key)
+				self._log_handler.debug("Attempting to locate DB files at " + str(file_loc))
+				if(destroy):
+					try:
+						plyvel.destroy_db(file_loc)
+					except Exception as ex:
+						self._log_handler.warning("Receiving and exception when deleting a DB: " + str(ex.message))
+						pass
+				if (create_if_missing):
+					try:
+						db[key]= plyvel.DB(file_loc, create_if_missing=True)
+						res[key] = True
+					except Exception as ex:
+						self._log_handler.error("Received Exception when creating DB handler for : " + str(key) + " : " + str(ex.message))
+						res[key]= False
+				else:
+					try:
+						db[key]=plyvel.DB(file_loc, create_if_missing=False)
+						res[key] = True
+					except IOError:
+						self._log_handler.info("DB not found. Cannot restore data")
+						res[key] = False
+			except Exception as ex:
+				self._log_handler.exception("Encountered Exception in creating DB handlers: ")
+				res[key] = False
+		return (res, _KEYS, db)
+
+	def restore_from_db(self):
+		self._log_handler.debug("Starting restoration of data")
+		(res, _KEYS, db) = self._populate_db_handlers(destroy=False, create_if_missing=True)
+		try:
+			for item in _KEYS:
+				if(res[item]):
+					for key,value in db[item]:
+						try:
+							self._mininet_data[item][key] = self._convert_to_dict(value.decode())
+							self._log_handler.debug("Restored Key: "  + str(key)+" Value: "+ str(self._mininet_data[item][key]) + " from " + str(item) + " DB."	)
+						except TypeError as tx:
+							self._log_handler.error("Encountered error when decoding " + str(item) + " db data: " + str(tx.message))
+						except Exception as ex:
+							self._log_handler.exception("Encountered error when decoding " + str(item) + " db data: " + str(ex.message))
+					self._log_handler.info("Restored data from DB: " + str(item))
+				else:
+					self._log_handler.warning("DB handler: " + str(item) + "could not be populated. Data from this DB is not restored")
+			result=self._dockernet.restore_from_db()
+			if (result):
+				self._log_handler.info("All data restored")
+				if(self._dockernet.get_num_computes()> 0):
+					self._log_handler.debug("Found " + str(self._dockernet.get_num_computes()) + " computes. Starting simulation")
+					self._SIMULATION_STARTED = True
+			else:
+				self._log_handler.error("Could not restore all data. System state inconsistent. Terminating the program")
+				self._log_handler.error("Try deleting all the DBs by running rm -rf " + str(self._db_loc) + "* and restarting the program")
+				sys.exit(1)
+		except Exception as ex:
+			self._log_handler.error("Encountered exception during restoration: " + str(ex.message))
+			sys.exit(1)'''
+
+
 class DockerHandler():
 	def get_docker_client(self):
 		return docker.APIClient
 
-	def __init__(self, partition_id = 0, tep_subnet="10.173.77.0/24", neutron_ip="192.168.0.1"):
-		self._setup_logger("Dockernet", "/home/stack/mininet_handler/Dockernet.log", level=logging.DEBUG)
+	def reset(self):
+		self.delete_virtual_computes()
+		for key in self._databases:
+			self._dockernet_db[key] = dict()
+		self._list_of_ovs= list()
+
+	def read_config(self, file_location):
+		grp = cfg.OptGroup('dockernet_properties')
+		opts = [cfg.StrOpt("log_file", default="/home/stack/mininet_handler/Dockernet.log"),
+		        cfg.StrOpt("db_loc", default="/home/stack/mininet_handler/db/"),
+		        cfg.StrOpt("tep_subnet", default="10.173.77.0/24"),
+		        cfg.StrOpt("neutron_ip", default="192.168.56.101"),
+			        cfg.StrOpt("flow_dump_folder", default="/home/stack/mininet_handler/logs"),
+		        cfg.IntOpt("docker_port", default=5000),
+		        cfg.IntOpt("max_threads", default=5),
+		        cfg.StrOpt("virtual_compute_image_name", default="dind:bionic"),
+		        cfg.StrOpt("vm_image_name", default="base_image:bionic"),
+		        cfg.StrOpt("partition_id", default=uuid.uuid4()),
+		        cfg.StrOpt("neutron_user_name", default="admin"),
+		        cfg.StrOpt("neutron_password", default="password"),
+		        cfg.BoolOpt("TLS_enabled", default=False),
+		        cfg.StrOpt("ca_cert_loc", default="./cacert.crt"),
+		        cfg.StrOpt("auth_url", default="http://192.168.56.101/identity/"),
+		        cfg.StrOpt("project_domain_id", default="default"),
+		        cfg.StrOpt("user_domain_id", default="default"),
+		        cfg.StrOpt("project_name", default="admin")]
+		cfg.CONF.register_group(grp)
+		cfg.CONF.register_opts(opts, group=grp)
+		try:
+			file_location= ['--config-file', str(file_location)]
+			cfg.CONF(file_location)
+		except Exception as ex:
+			print("Error in processing configuration file. Exitting the program")
+			print("Exception:" + str(ex.message))
+			sys.exit(1)
+		self._log_file = cfg.CONF.dockernet_properties.log_file
+		self._db_loc = cfg.CONF.dockernet_properties.db_loc
+		self._tep_ip_subnet=cfg.CONF.dockernet_properties.tep_subnet
+		self._neutron_ip=cfg.CONF.dockernet_properties.neutron_ip
+		self._flow_dump_folder=cfg.CONF.dockernet_properties.flow_dump_folder
+		self._docker_port=cfg.CONF.dockernet_properties.docker_port
+		global MAX_THREADS
+		MAX_THREADS=cfg.CONF.dockernet_properties.max_threads
+		self._ovs_docker_image=cfg.CONF.dockernet_properties.virtual_compute_image_name
+		self._vm_image=cfg.CONF.dockernet_properties.vm_image_name
+		self._partition_id= "1" #str(cfg.CONF.dockernet_properties.partition_id)[0:10]
+		self._neutron_user_name = cfg.CONF.dockernet_properties.neutron_user_name
+		self._neutron_password = cfg.CONF.dockernet_properties.neutron_password
+		self._TLS_enabled = cfg.CONF.dockernet_properties.TLS_enabled
+		self._ca_certificate=None
+		self._project_domain_id =  cfg.CONF.dockernet_properties.project_domain_id
+		self._project_name = cfg.CONF.dockernet_properties.project_name
+		self._user_domain_id =  cfg.CONF.dockernet_properties.user_domain_id
+		if(self._TLS_enabled):
+			self._ca_certificate=cfg.CONF.dockernet_properties.ca_cert_loc
+		self._keystone_auth_url=cfg.CONF.dockernet_properties.auth_url
+
+	def _create_keystone_session(self):
+		auth = identity.Password(auth_url=self._keystone_auth_url,
+		                   username=self._neutron_user_name,
+		                   password=self._neutron_password,
+		                   project_name=self._project_name,
+		                   user_domain_id=self._user_domain_id,
+		                   project_domain_name=self._project_domain_id)
+		self._sess = session.Session(auth=auth)
+
+	def __init__(self, file_location="/home/stack/mininet_handler/config.ini"):
+		self.read_config(file_location)
+		self._setup_logger("Dockernet", self._log_file, level=logging.DEBUG)
 		self._log_handler = logging.getLogger("Dockernet")
-		self._flow_dump_folder = "/home/stack/mininet_handler/logs"
-		self._db_loc  = "/home/stack/mininet_handler/db/"
-		self._databases = list(["ovs_to_port_mapping", "list_of_ovs", "mip_to_port_mapping", "extra_routes_to_port_mapping", "virtual_computes"])
+		self._databases = list(["ovs_to_port_mapping", "list_of_ovs", "mip_to_port_mapping", "extra_routes_to_port_mapping", "virtual_computes", "tenant_vm_to_compute_info"])
 		self._dockernet_db= dict()
 		self._list_of_ovs = list()
 		for key in self._databases:
 			self._dockernet_db[key] = dict()
 		self._docker_ip = self._get_docker_ip()
-		self._tep_ip_subnet = tep_subnet
-		self._docker_port = 5000
-		self._ovs_docker_image = "dind:bionic"
-		self._vm_image = "base_image:bionic"
-		self._virtual_computes = dict()
-		self._docker_api_port_compute = 21500
-		self._partition_id = partition_id
-		self._neutron_ip = neutron_ip
 		options = {
 			'version': 'auto'
 		}
@@ -55,24 +209,24 @@ class DockerHandler():
 			self._log_handler.debug("Received csc_underlay network info:" + str(network_info[0]["Id"]))
 		except docker.errors.APIError as ex:
 			self._log_handler.error("Received error : " + str(ex.message) + " When checking for csc_underlay network info")
-		self._network_id = network_info["Id"]
+		self._network_id = network_info[0]["Id"]
+		self._create_keystone_session()
+		self.restore_from_db()
+
+	def get_partition_id(self):
+		return self._partition_id
 
 	def build_container_options(self, controller_ip, index):
 		options = dict()
-		options['host_config'] = {'privileged': True}
+		options['host_config'] =self.dc.create_host_config(privileged=True)
 		options['image'] = self._ovs_docker_image
 		my_ip = self._tep_ip_subnet.split("/")[0].split(".")[0:3]
 		my_ip = ".".join(my_ip) + "." + str(100+index)
-		options['environment'] = {
-			'CONTROLLER_IP': controller_ip,
-			'BR_IP':  my_ip,
-			'DP_ID': str(index+1),
-			'TERM' : 'xterm',
-			'SHELL': '/bin/bash'
-		}
+		options['environment'] = ['CONTROLLER_IP=' + str(controller_ip), 'BR_IP='+str(my_ip), 'DP_ID=' + str(index), 'TERM=xterm','SHELL=/bin/bash', "DOCKER_IP=" + str(self._docker_ip)]
 		options['name'] = self._partition_id + "_ovs" + str(index)
 		options['hostname'] = self._partition_id + "_ovs" + str(index)
 		options['image'] = self._ovs_docker_image
+		options["detach"] = True
 		return options
 
 	def create_virtual_compute(self, controller_ip, index):
@@ -84,7 +238,8 @@ class DockerHandler():
 			if(warnings != []):
 				self._log_handler.warning("Received warning : " + str(warnings) + " When creating container with index: " + str(index) + " ID: " + str(container_id))
 			self._list_of_ovs.append(options["name"])
-			self._dockernet_db["virtual_computes"][container_id] = container_id
+			self._dockernet_db['list_of_ovs'][options['name']] = options['name']
+			self._dockernet_db["virtual_computes"][str(container_id)] = str(container_id)
 			self.dc.connect_container_to_network(container_id, self._network_id)
 			self.dc.start(container_id)
 			self._log_handler.debug("Started container with Index:  " + str(index) + " Id: " + str(container_id) + " successfully")
@@ -96,15 +251,22 @@ class DockerHandler():
 
 	def delete_virtual_computes(self):
 		result = True
-		for container in self._virtual_computes.keys():
+		for container in self._dockernet_db["virtual_computes"].values():
 			try:
-				self.dc.stop(container)
 				filter = dict()
-				filter["Id"] = container
+				filter["id"] = container
 				container_info = self.dc.containers(filters=filter)
+				self.dc.stop(container,timeout=1)
 				self.dc.remove_container(container)
 				self._dockernet_db["virtual_computes"].pop(container)
-				self._list_of_ovs.remove(container_info["Names"][0])
+				self._log_handler.debug("Attempting to remove container: " + str(container_info[0]["Names"][0]) + " from ovs")
+				self._log_handler.debug("List of OVS: " + str(self._list_of_ovs))
+				self._list_of_ovs.remove(container_info[0]["Names"][0].split("/")[1])
+				try:
+					self._dockernet_db['list_of_ovs'].pop(container_info[0]["Names"][0].split("/")[1])
+				except Exception as ex:
+					self._log_handler.error("Received error when removing from db['list_of_ovs'" + str(ex.message))
+					pass
 				self._log_handler.debug("Removed container: " + container + " Successfully")
 			except Exception as ex:
 				self._log_handler.error("Received exception " + str(ex.message) + " for deleting container: " + str(container))
@@ -118,33 +280,37 @@ class DockerHandler():
 		return str(self._list_of_ovs)
 
 	def _populate_db_handlers(self, destroy=False, create_if_missing=False):
-		keys = self._databases
-		res = dict()
+		_KEYS = self._databases
 		db = dict()
-		for key in keys:
+		res = dict()
+		for key in _KEYS:
 			try:
 				file_loc = self._db_loc + str(key)
-			except IOError:
-				self._log_handler.info("No DB files found for " + str(key) + ". No restoration is possible")
-				res[key] = False
-				continue
-			try:
+				self._log_handler.debug("Attempting to locate DB files at " + str(file_loc))
 				if(destroy):
-					plyvel.destroy_db(file_loc)
+					try:
+						plyvel.destroy_db(file_loc)
+					except Exception as ex:
+						self._log_handler.warning("Receiving and exception when deleting a DB: " + str(ex.message))
+						pass
 				if (create_if_missing):
-					db[key]= plyvel.DB(file_loc, create_if_missing=True)
+					try:
+						db[key]= plyvel.DB(file_loc, create_if_missing=True)
+						res[key] = True
+					except Exception as ex:
+						self._log_handler.error("Received Exception when creating DB handler for : " + str(key) + " : " + str(ex.message))
+						res[key]= False
 				else:
-					db[key]= plyvel.DB(file_loc, create_if_missing=False)
-				if (key == "list_of_ovs"):
-					self._dockernet_db[key] = dict()
-					for item in self._list_of_ovs:
-						self._dockernet_db[key][item] = item
-				res[key] = True
+					try:
+						db[key]=plyvel.DB(file_loc, create_if_missing=False)
+						res[key] = True
+					except IOError:
+						self._log_handler.info("DB not found. Cannot restore data")
+						res[key] = False
 			except Exception as ex:
-				self._log_handler.error("Encountered Exception when wrting to DB: " + str(ex.message))
+				self._log_handler.exception("Encountered Exception in creating DB handlers: ")
 				res[key] = False
-				continue
-		return (res, keys, db)
+		return (res, _KEYS, db)
 
 	def restore_from_db(self):
 		self._log_handler.debug("Starting restoration of data")
@@ -157,6 +323,7 @@ class DockerHandler():
 						if(item =="list_of_ovs"):
 							self._list_of_ovs.append(key)
 					self._log_handler.debug("Data from database: " + item + " restored")
+					self._log_handler.debug("Restored item: " + str(self._dockernet_db[item]))
 				else:
 					self._log_handler.warning("Data from database: " + item + " not found")
 			return True
@@ -171,11 +338,10 @@ class DockerHandler():
 				if res[item]:
 					wb = db[item].write_batch()
 					for key in self._dockernet_db[item].keys():
-						wb.put(key, self._dockernet_db[item][key])
+						wb.put(str(key), str(self._dockernet_db[item][key]))
 					wb.write()
 					self._log_handler.debug("Data from dict: " + item + " stored on the disk")
 					self._log_handler.debug("Data stored: " + item + ": " + str(self._dockernet_db[item]))
-			self._list_of_ovs = list(self._dockernet_db["list_of_ovs"].keys())
 			return True
 		except Exception as ex:
 			self._log_handler.error("Encountered Exception when wrting to DB: " + str(ex.message))
@@ -260,7 +426,7 @@ class DockerHandler():
 
 	def get_container_creation_command(self, image_port_tuple, gateway_cidr_tuple_list, action, mac_address, port_uuid):
 		(cont_name, dind_name, dind_image, tapPortName, vm_port_name) = image_port_tuple
-		executable = " python3.6 create_containers.py -op " + str(action) + " -c "
+		executable = " python3.5 create_containers.py -op " + str(action) + " -c "
 		options = str(dind_name) + " -i " + str(dind_image) + " -o " + str(tapPortName) + " -v " + str(vm_port_name) + " -m \"" + mac_address + "\" "
 		ipconfig = ""
 		if (gateway_cidr_tuple_list != None):
@@ -274,15 +440,45 @@ class DockerHandler():
 		return cmd
 
 	def get_image_port_tuple(self, ovs_switch_id, port_uuid):
-		tapPortName = "tap" + str(port_uuid[0:8]).replace("-","")
+		tapPortName = "tap" + str(port_uuid).replace("-","")[0:11]
 		cont_name = self._list_of_ovs[ovs_switch_id]
-		vm_port_name = "vm" + (port_uuid[0:8]).replace("-","")
-		dind_name = cont_name+ port_uuid[0:10]
+		vm_port_name = "vm" + (port_uuid).replace("-","")[0:11]
+		dind_name = cont_name+ port_uuid.replace("-","")[0:11]
 		dind_image = str(self._docker_ip).replace("\n","") + ":" +str(self._docker_port) + "/" + self._vm_image
 		image_port_tuple = (cont_name, dind_name, dind_image, tapPortName, vm_port_name)
 		return image_port_tuple
 
+	def does_port_exist_already(self, port_uuid):
+		try:
+			ovs_switch_id = self._dockernet_db["ovs_to_port_mapping"][port_uuid]
+			self._log_handler.info("Port: " + port_uuid + " exists on " + str(ovs_switch_id))
+			return True
+		except KeyError:
+			self._log_handler.info("Port: " + port_uuid + " does not exist. Will boot the VM")
+			return False
+
+	def populate_port_location_info(self, gateway_cidr_tuple_list, ovs_switch_id, port_uuid):
+		data = dict()
+		try:
+			data["location"] = self._list_of_ovs[ovs_switch_id]
+			for item in gateway_cidr_tuple_list:
+				(ip,gateway, cidr, ip_version)=item
+				data["ip_v"+str(ip_version)] =ip
+				data["gateway_v"+str(ip_version)] = gateway
+				data["subnet_v" + str(ip_version)] = cidr
+			self._dockernet_db["tenant_vm_to_compute_info"][port_uuid]= data
+			self._log_handler.debug("Stored information on port: " + port_uuid)
+			return True
+		except Exception as ex:
+			self._log_handler.error("Encountered exception: " + str(ex.message) + " when storing data")
+
+	def get_port_info(self):
+		return self._dockernet_db["tenant_vm_to_compute_info"]
+
 	def add_port_to_ovs(self, gateway_cidr_tuple_list, port_uuid, mac_address):
+		does_port_exist = self.does_port_exist_already(port_uuid)
+		if(does_port_exist):
+			return True
 		switch_count = len(self._list_of_ovs)
 		hash = int(hashlib.sha512(str(port_uuid).encode()).hexdigest(),16)
 		ovs_switch_id = hash % switch_count
@@ -295,17 +491,19 @@ class DockerHandler():
 		image_port_tuple = self.get_image_port_tuple(ovs_switch_id,port_uuid)
 		cmd = self.get_container_creation_command(image_port_tuple, gateway_cidr_tuple_list, "add", mac_address, port_uuid)
 		self._log_handler.debug("Executing command: " + cmd)
- 		result = self._exec_command(cmd)
-		return result
+		result = self._exec_command(cmd)
+		return (result and self.populate_port_location_info(gateway_cidr_tuple_list, ovs_switch_id, port_uuid))
+
 
 	def send_port_update_to_neutron(self, compute_hostname, port_uuid):
-		url="https://" + str(self._neutron_ip) + "/v2.0/ports/" + str(port_uuid)
+		neutron_client = client.Client(session=self._sess)
 		port = dict()
 		port["port"] = dict()
 		port["port"]["binding:host_id"]=compute_hostname
 		try:
-			r = requests.post(url, auth=("admin", "admin"), verify=False,json=port)
+			neutron_client.update_port(port_uuid,port)
 			self._log_handler.debug("Neutron update for port: " + str(port_uuid) + " completed. VM will be hosted on virtual compute: " + str(compute_hostname))
+			return True
 		except Exception as ex:
 			self._log_handler.error("When posting neutron update, received exception: " + str(ex.message))
 			return False
@@ -420,8 +618,9 @@ class DockerHandler():
 
 	def docker_ovs_run_connect(self, switch_count, controller_ip):
 		result = list()
+		self.clean_old_setup()
 		for compute_index in range(0,switch_count):
-			result.append(self.create_virtual_compute(controller_ip, compute_index))
+			result.append(self.create_virtual_compute(controller_ip, compute_index+1))
 		success= reduce(lambda a,b:  a and b, result)
 		if success:
 			self._log_handler.debug("Creation of virtual computes successful")
@@ -490,7 +689,7 @@ class DockerHandler():
 			nh_string = ""
 		else:
 			nh_string= " -n " + str(next_hop)
-		executable = " python3.6 /configure_mips.py -op " + str(action) + " -c " + str(dind_name) + " -p " + str(vm_port_name) + " -i " + mip + " -l " + prefix_length  + str(nh_string)
+		executable = " python3.5 /configure_mips.py -op " + str(action) + " -c " + str(dind_name) + " -p " + str(vm_port_name) + " -i " + mip + " -l " + prefix_length  + str(nh_string)
 		cmd = "docker exec " + str(cont_name) +  executable
 		return cmd
 
